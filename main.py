@@ -1,33 +1,19 @@
-from flask import Flask, request, send_file
-import tempfile
+from fastapi import FastAPI, UploadFile, File
+from fastapi.responses import FileResponse
 import os
-import datetime
+from datetime import datetime
 from reconcile import reconcile
 
-app = Flask(__name__)
+app = FastAPI()
 
-@app.route("/")
-def hello():
-    return "🧾 Excel reconciliation API is working."
+@app.post("/process")
+async def process_file(data: UploadFile = File(...)):
+    input_path = f"/tmp/{data.filename}"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = f"/tmp/file_processed_{timestamp}.xlsx"
 
-@app.route("/process", methods=["POST"])
-def process():
-    uploaded_file = request.files.get("data")
-    if not uploaded_file:
-        return "❌ No file uploaded", 400
+    with open(input_path, "wb") as f:
+        f.write(await data.read())
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_in:
-        uploaded_file.save(tmp_in.name)
-        in_path = tmp_in.name
-
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path = os.path.join("/tmp", f"file_processed_{timestamp}.xlsx")
-
-    reconcile(in_path, out_path)
-
-    return send_file(
-        out_path,
-        as_attachment=True,
-        download_name=os.path.basename(out_path),
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    reconcile(input_path, output_path)
+    return FileResponse(output_path, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filename=os.path.basename(output_path))
