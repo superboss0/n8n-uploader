@@ -2,3 +2,6 @@ flask
 pandas
 openpyxl
 gunicorn
+fastapi
+uvicorn[standard]
+python-multipart
