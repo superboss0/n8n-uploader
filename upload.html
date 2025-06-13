@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Конвертация Excel-файла</title>
+</head>
+<body style="font-family: sans-serif; padding: 30px; background: #f8f8f8;">
+  <h2>Загрузите бухгалтерский файл (.xlsx)</h2>
+  <form action="https://octopays.app.n8n.cloud/webhook-test/9e38f836-feb0-4101-a495-171a4d29c690"
+        method="post"
+        enctype="multipart/form-data">
+    <input type="file" name="data" accept=".xlsx" required style="margin-bottom: 20px;" />
+    <br>
+    <button type="submit" style="padding: 10px 20px; font-size: 16px;">Обработать</button>
+  </form>
+  <p style="margin-top: 20px; font-size: 14px; color: #555;">После обработки вы получите готовый файл .xlsx</p>
+</body>
+</html>
