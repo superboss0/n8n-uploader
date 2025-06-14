@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import asyncio
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 import os
@@ -6,6 +7,11 @@ from datetime import datetime
 import traceback
 
 app = FastAPI()
+
+@app.on_event("startup")
+async def delay_startup_for_render():
+    # дать время на инициализацию до health-check от Render
+    await asyncio.sleep(2)
 
 @app.get("/")  # лёгкий health-check
 async def root():
