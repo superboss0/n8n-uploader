@@ -1,3 +1,60 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Конвертация Excel-файла</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f8f8f8;
+      padding: 30px;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 16px;
+    }
+    #status.success {
+      color: green;
+    }
+    #status.error {
+      color: red;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    /* спиннер */
+    #loader {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      border: 3px solid rgba(0,0,0,0.2);
+      border-radius: 50%;
+      border-top-color: #333;
+      animation: spin 1s linear infinite;
+      vertical-align: middle;
+      margin-left: 10px;
+      visibility: hidden;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <h2>Загрузите бухгалтерский файл (.xlsx)</h2>
+
+  <form id="uploadForm">
+    <input type="file" name="data" accept=".xlsx" required />
+    <br><br>
+    <button type="submit" id="submitBtn" style="padding: 10px 20px; font-size: 16px;">
+      Обработать
+    </button>
+    <div id="loader"></div>
+  </form>
+
+  <div id="status"></div>
+
   <script>
     const form = document.getElementById("uploadForm");
     const status = document.getElementById("status");
@@ -79,3 +136,5 @@
       }
     });
   </script>
+</body>
+</html>
