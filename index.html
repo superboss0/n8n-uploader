@@ -1,60 +1,3 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <title>Конвертация Excel-файла</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #f8f8f8;
-      padding: 30px;
-    }
-    #status {
-      margin-top: 20px;
-      font-size: 16px;
-    }
-    #status.success {
-      color: green;
-    }
-    #status.error {
-      color: red;
-    }
-    button:disabled {
-      background-color: #ccc;
-      cursor: not-allowed;
-    }
-    /* спиннер */
-    #loader {
-      display: inline-block;
-      width: 24px;
-      height: 24px;
-      border: 3px solid rgba(0,0,0,0.2);
-      border-radius: 50%;
-      border-top-color: #333;
-      animation: spin 1s linear infinite;
-      vertical-align: middle;
-      margin-left: 10px;
-      visibility: hidden;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  </style>
-</head>
-<body>
-  <h2>Загрузите бухгалтерский файл (.xlsx)</h2>
-
-  <form id="uploadForm">
-    <input type="file" name="data" accept=".xlsx" required />
-    <br><br>
-    <button type="submit" id="submitBtn" style="padding: 10px 20px; font-size: 16px;">
-      Обработать
-    </button>
-    <div id="loader"></div>
-  </form>
-
-  <div id="status"></div>
-
   <script>
     const form = document.getElementById("uploadForm");
     const status = document.getElementById("status");
@@ -65,15 +8,13 @@
       e.preventDefault();
       status.textContent = "";
       status.className = "";
-      const fileInput = form.querySelector('input[type="file"]');
-      const file = fileInput.files[0];
+      const file = form.querySelector('input[type="file"]').files[0];
       if (!file) {
         status.textContent = "Пожалуйста, выберите файл.";
         status.className = "error";
         return;
       }
 
-      // подготовка UI
       submitBtn.disabled = true;
       loader.style.visibility = "visible";
       status.textContent = "🧾 Файл загружается…";
@@ -87,47 +28,49 @@
           { method: "POST", body: formData }
         );
 
-        const contentType = response.headers.get("content-type") || "";
-
+        // 1) если не 2xx — показываем код
         if (!response.ok) {
-          // попытаться прочитать текст ошибки
-          let errMsg = response.statusText;
-          try { errMsg = await response.text(); } catch {}
-          throw new Error(`Сервер вернул ${response.status}: ${errMsg}`);
+          status.textContent = `❌ Ошибка сервера: ${response.status}`;
+          status.className = "error";
+          return;
         }
 
-        // JSON-ответ от Respond to Webhook
-        if (contentType.includes("application/json")) {
-          const result = await response.json();
-          status.textContent = result.message || "✅ Успешно.";
-          status.className = "success";
-
-        // бинарный файл — начинаем скачивание
-        } else if (contentType.includes("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) {
-          const blob = await response.blob();
-          // динамическое имя файла: если есть в заголовке Content-Disposition — вытягиваем, иначе original_reconciled.xlsx
-          let filename = file.name.replace(/\.xlsx$/i, "_reconciled.xlsx");
-          const cd = response.headers.get("content-disposition") || "";
-          const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/.exec(cd);
-          if (m && m[1]) filename = decodeURIComponent(m[1]);
-
-          const downloadUrl = window.URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = downloadUrl;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          status.textContent = "✅ Файл обработан и скачан.";
-          status.className = "success";
-
-        } else {
-          throw new Error("Неизвестный тип ответа: " + contentType);
+        // 2) попробуем распарсить JSON
+        let text = await response.clone().text();
+        try {
+          const json = JSON.parse(text);
+          // если в JSON есть 'message' — выводим его
+          if (json.message) {
+            status.textContent = json.message;
+            status.className = "success";
+            return;
+          }
+        } catch {
+          // не JSON — идём дальше
         }
+
+        // 3) иначе — считаем, что это файл и пытаемся скачать
+        const blob = await response.blob();
+        // динамическое имя файла из Content-Disposition или из исходного
+        let filename = file.name.replace(/\.xlsx$/i, "_reconciled.xlsx");
+        const cd = response.headers.get("content-disposition") || "";
+        const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/.exec(cd);
+        if (m && m[1]) filename = decodeURIComponent(m[1]);
+
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        status.textContent = "✅ Файл обработан и скачан.";
+        status.className = "success";
 
       } catch (err) {
         console.error(err);
-        status.textContent = "❌ " + err.message;
+        status.textContent = `❌ ${err.message}`;
         status.className = "error";
 
       } finally {
@@ -136,5 +79,3 @@
       }
     });
   </script>
-</body>
-</html>
