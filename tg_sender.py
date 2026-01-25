@@ -28,9 +28,10 @@ def _to_peer(target: str):
 
 async def send_tg(target: str, text: str):
     await client.start()
-    peer = _to_peer(target)
+    peer = await _resolve_target(target)
     await client.send_message(peer, text)
 
 async def send_file(target: str, file_path: str, caption: str | None = None):
     await client.start()
-    await client.send_file(target, file_path, caption=caption)
+    peer = await _resolve_target(target)
+    await client.send_file(peer, file_path, caption=caption)
