@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 import asyncio
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 import os
 from datetime import datetime
 import traceback
 from pydantic import BaseModel
+
 
 app = FastAPI()
 
@@ -44,6 +45,39 @@ async def tg_send(payload: TgSendRequest):
             raise HTTPException(status_code=400, detail="text is required")
 
         await send_tg(target, text)
+        return {"ok": True}
+
+    except HTTPException:
+        raise
+    except Exception:
+        tb = traceback.format_exc()
+        print(tb)
+        raise HTTPException(status_code=500, detail=tb)
+
+@app.post("/tg/send_file")
+async def tg_send_file(
+    target: str = Form(...),
+    caption: str | None = Form(None),
+    file: UploadFile = File(...)
+):
+    """
+    multipart/form-data: target, caption, file
+    """
+    try:
+        from tg_sender import send_file_tg
+
+        target = target.strip()
+        caption = (caption or "").strip() or None
+
+        if not target:
+            raise HTTPException(status_code=400, detail="target is required")
+
+        # сохраняем во временный файл
+        tmp_path = f"/tmp/{file.filename}"
+        with open(tmp_path, "wb") as f:
+            f.write(await file.read())
+
+        await send_file_tg(target, tmp_path, caption=caption)
         return {"ok": True}
 
     except HTTPException:
