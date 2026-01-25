@@ -4,3 +4,4 @@ gunicorn
 fastapi
 uvicorn[standard]
 python-multipart
+telethon==1.42.0
