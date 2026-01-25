@@ -30,3 +30,7 @@ async def send_tg(target: str, text: str):
     await client.start()
     peer = _to_peer(target)
     await client.send_message(peer, text)
+
+async def send_file(target: str, file_path: str, caption: str | None = None):
+    await client.start()
+    await client.send_file(target, file_path, caption=caption)
