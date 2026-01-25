@@ -54,17 +54,19 @@ async def tg_send(payload: TgSendRequest):
         print(tb)
         raise HTTPException(status_code=500, detail=tb)
 
+
 @app.post("/tg/send_file")
 async def tg_send_file(
     target: str = Form(...),
     caption: str | None = Form(None),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
 ):
     """
     multipart/form-data: target, caption, file
     """
     try:
-        from tg_sender import send_file_tg
+        # ВАЖНО: функция называется send_file (а не send_file_tg)
+        from tg_sender import send_file
 
         target = target.strip()
         caption = (caption or "").strip() or None
@@ -77,7 +79,7 @@ async def tg_send_file(
         with open(tmp_path, "wb") as f:
             f.write(await file.read())
 
-        await send_file_tg(target, tmp_path, caption=caption)
+        await send_file(target, tmp_path, caption=caption)
         return {"ok": True}
 
     except HTTPException:
