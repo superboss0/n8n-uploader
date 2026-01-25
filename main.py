@@ -6,6 +6,7 @@ from starlette.concurrency import run_in_threadpool
 import os
 from datetime import datetime
 import traceback
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -17,6 +18,42 @@ async def delay_startup_for_render():
 @app.get("/")  # Health check endpoint
 async def root():
     return {"status": "ok"}
+
+# --- TG Sender API ---
+
+class TgSendRequest(BaseModel):
+    target: str | int
+    text: str
+
+@app.post("/tg/send")
+async def tg_send(payload: TgSendRequest):
+    """
+    Отправляет сообщение через Telethon (MTProto) от аккаунта, заданного TG_SESSION.
+    target: user_id (int) или '@username' или 'me'
+    """
+    try:
+        # Импортируем только по факту, чтобы сервис мог стартовать без env при локальном тесте
+        from tg_sender import send_tg
+
+        target = str(payload.target).strip()
+        text = payload.text.strip()
+
+        if not target:
+            raise HTTPException(status_code=400, detail="target is required")
+        if not text:
+            raise HTTPException(status_code=400, detail="text is required")
+
+        await send_tg(target, text)
+        return {"ok": True}
+
+    except HTTPException:
+        raise
+    except Exception:
+        tb = traceback.format_exc()
+        print(tb)
+        raise HTTPException(status_code=500, detail=tb)
+
+# --- Existing file processing ---
 
 @app.post("/process")
 async def process_file(data: UploadFile = File(...)):
