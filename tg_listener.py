@@ -1,6 +1,7 @@
 import os
 import re
 from telethon import events
+from telethon.tl.types import User, Channel
 from tg_sender import client  # используем тот же Telethon client и сессию
 
 # Куда пересылать алерты
@@ -16,7 +17,6 @@ REQ_PATTERNS = [
     r"\b(на какой|куда)\b.*\bкошел[её]к\b",
     r"\bкошел[её]к\b.*\b(на сегодня|актуальный|для пополнения|для при[её]ма|принять)\b",
 ]
-
 REQ_RE = re.compile("|".join(f"(?:{p})" for p in REQ_PATTERNS), re.IGNORECASE)
 
 # Исключения (не запрос)
@@ -54,12 +54,20 @@ def install_handlers():
 
     @client.on(events.NewMessage)
     async def handler(event):
+        chat = await event.get_chat()
+
+        # ✅ слушаем только группы/супергруппы
+        if isinstance(chat, User):
+            return
+        if isinstance(chat, Channel) and not getattr(chat, "megagroup", False):
+            # это канал (не супергруппа) — пропускаем
+            return
+
         text = event.raw_text or ""
         if not is_wallet_request_ru_trc20(text):
             return
 
         sender = await event.get_sender()
-        chat = await event.get_chat()
 
         sender_name = (
             getattr(sender, "username", None)
@@ -69,7 +77,7 @@ def install_handlers():
         chat_name = (
             getattr(chat, "title", None)
             or getattr(chat, "username", None)
-            or "private"
+            or "group"
         )
 
         alert = (
