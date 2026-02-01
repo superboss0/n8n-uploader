@@ -8,13 +8,45 @@ from datetime import datetime
 import traceback
 from pydantic import BaseModel
 
-
 app = FastAPI()
+
+tg_task = None  # <= ВАЖНО: глобально, рядом с app
 
 @app.on_event("startup")
 async def delay_startup_for_render():
     # Дать Render время на инициализацию перед health-check
     await asyncio.sleep(2)
+
+    # --- TG listener startup ---
+    global tg_task
+    try:
+        from tg_listener import install_handlers
+        from tg_sender import client
+
+        install_handlers()
+        await client.start()
+
+        # не блокируем запуск FastAPI
+        tg_task = asyncio.create_task(client.run_until_disconnected())
+
+        print("✅ TG listener started")
+    except Exception as e:
+        # чтобы API не падал, даже если TG env не настроены/сломаны
+        print("⚠️ TG listener not started:", repr(e))
+
+@app.on_event("shutdown")
+async def shutdown():
+    global tg_task
+    try:
+        from tg_sender import client
+
+        if tg_task:
+            tg_task.cancel()
+
+        await client.disconnect()
+        print("✅ TG listener stopped")
+    except Exception as e:
+        print("⚠️ TG listener stop error:", repr(e))
 
 @app.get("/")  # Health check endpoint
 async def root():
