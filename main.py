@@ -8,17 +8,52 @@ from datetime import datetime
 import traceback
 from pydantic import BaseModel
 
-
 app = FastAPI()
 
+# Background task for Telethon listener
+tg_task = None
+
+
 @app.on_event("startup")
-async def delay_startup_for_render():
-    # Дать Render время на инициализацию перед health-check
+async def startup():
+    # Give Render some time before health-checks
     await asyncio.sleep(2)
+
+    # Start TG listener in the background (must NOT block FastAPI startup)
+    global tg_task
+    try:
+        from tg_listener import install_handlers
+        from tg_sender import client
+
+        install_handlers()
+        await client.start()
+        tg_task = asyncio.create_task(client.run_until_disconnected())
+
+        print("✅ TG listener started")
+    except Exception as e:
+        # Do not crash the API if Telegram env vars are missing or TG fails to start
+        print("⚠️ TG listener not started:", repr(e))
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    global tg_task
+    try:
+        from tg_sender import client
+
+        if tg_task:
+            tg_task.cancel()
+
+        await client.disconnect()
+        print("✅ TG listener stopped")
+    except Exception as e:
+        print("⚠️ TG listener stop error:", repr(e))
+
 
 @app.get("/")  # Health check endpoint
 async def root():
     return {"status": "ok"}
+
 
 # --- TG Sender API ---
 
@@ -26,14 +61,14 @@ class TgSendRequest(BaseModel):
     target: str | int
     text: str
 
+
 @app.post("/tg/send")
 async def tg_send(payload: TgSendRequest):
     """
-    Отправляет сообщение через Telethon (MTProto) от аккаунта, заданного TG_SESSION.
-    target: user_id (int) или '@username' или 'me'
+    Send a text message via Telethon (MTProto) using TG_SESSION account.
+    target: user_id (int) or '@username' or 'me'
     """
     try:
-        # Импортируем только по факту, чтобы сервис мог стартовать без env при локальном тесте
         from tg_sender import send_tg
 
         target = str(payload.target).strip()
@@ -63,9 +98,9 @@ async def tg_send_file(
 ):
     """
     multipart/form-data: target, caption, file
+    Sends file to Telegram via Telethon.
     """
     try:
-        # ВАЖНО: функция называется send_file (а не send_file_tg)
         from tg_sender import send_file
 
         target = target.strip()
@@ -74,8 +109,9 @@ async def tg_send_file(
         if not target:
             raise HTTPException(status_code=400, detail="target is required")
 
-        # сохраняем во временный файл
-        tmp_path = f"/tmp/{file.filename}"
+        safe_name = file.filename or "metabase_export.xlsx"
+        tmp_path = f"/tmp/{safe_name}"
+
         with open(tmp_path, "wb") as f:
             f.write(await file.read())
 
@@ -89,15 +125,15 @@ async def tg_send_file(
         print(tb)
         raise HTTPException(status_code=500, detail=tb)
 
-# --- Existing file processing ---
+
+# --- Existing file processing API ---
 
 @app.post("/process")
 async def process_file(data: UploadFile = File(...)):
     try:
-        # Импортировать reconcile только при необходимости
         from reconcile import reconcile
 
-        # Сохраняем файл во временную директорию
+        # Save to tmp
         input_path = f"/tmp/{data.filename}"
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = f"/tmp/file_processed_{timestamp}.xlsx"
@@ -105,10 +141,10 @@ async def process_file(data: UploadFile = File(...)):
         with open(input_path, "wb") as f:
             f.write(await data.read())
 
-        # Асинхронно запускаем тяжёлую CPU-операцию
+        # Run CPU-heavy task in threadpool
         await run_in_threadpool(reconcile, input_path, output_path)
 
-        # Отдаём обработанный файл пользователю
+        # Return processed file
         return FileResponse(
             output_path,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
