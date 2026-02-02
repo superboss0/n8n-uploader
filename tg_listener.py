@@ -8,7 +8,7 @@ from tg_sender import client  # используем тот же Telethon client
 ALERT_TARGET = os.environ.get("ALERT_TARGET", "4906022006")
 
 # --- Regex: TRC-20 (TRON) address ---
-TRC20_RE = re.compile(r"\bT[1-9A-HJ-NP-Za-km-z]{33}\b")
+TRC20_RE = re.compile(r"\bT[1-9A-HJ-NP-Za-km-z]{33,35}\b")
 
 # --- Regex: Tronscan tx link ---
 TRONSCAN_TX_RE = re.compile(
@@ -80,29 +80,29 @@ def is_wallet_confirm_request_ru(text: str) -> bool:
 def is_wallet_request_ru_trc20(text: str) -> bool:
     """
     Запрос кошелька:
-    - если есть адрес + confirm => True (CONFIRM_WALLET)
-    - если есть адрес без confirm => False (скорее "дали кошелек")
-    - если нет адреса => обычный запрос REQ_RE (REQUEST_WALLET), кроме NEG_RE
+    - CONFIRM_WALLET: подтвердить актуальность/валидность кошелька (адрес может быть или не быть)
+    - REQUEST_WALLET: обычный запрос кошелька без адреса
+    - если есть адрес, но нет CONFIRM — это не запрос (скорее "дали кошелек")
     """
     t = (text or "").strip()
     if not t:
         return False
 
-    has_addr = bool(TRC20_RE.search(t))
-
-    # Адрес + подтверждение актуальности => это запрос
-    if has_addr and is_wallet_confirm_request_ru(t):
+    # 0) Confirm всегда считаем запросом (даже если адрес не распознан regex-ом)
+    if is_wallet_confirm_request_ru(t):
         return True
 
-    # Адрес без confirm => не считаем запросом (скорее просто "кошелек: ...")
+    has_addr = bool(TRC20_RE.search(t))
+
+    # 1) Адрес без confirm => не считаем запросом (скорее "кошелек: ...")
     if has_addr:
         return False
 
-    # исключения
+    # 2) исключения
     if NEG_RE.search(t):
         return False
 
-    # обычный запрос
+    # 3) обычный запрос
     return bool(REQ_RE.search(t))
 
 
@@ -114,20 +114,14 @@ def is_funds_inbound_notice_ru(text: str) -> bool:
 
 
 def detect_intent(text: str) -> str | None:
-    """
-    Возвращает intent:
-      - TX_SENT
-      - CONFIRM_WALLET
-      - REQUEST_WALLET
-      - None
-    """
     if is_funds_inbound_notice_ru(text):
         return "TX_SENT"
 
+    # CONFIRM приоритетнее, чем обычный запрос
+    if is_wallet_confirm_request_ru(text):
+        return "CONFIRM_WALLET"
+
     if is_wallet_request_ru_trc20(text):
-        # если есть confirm-смысл — это CONFIRM_WALLET
-        if is_wallet_confirm_request_ru(text):
-            return "CONFIRM_WALLET"
         return "REQUEST_WALLET"
 
     return None
