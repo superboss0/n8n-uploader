@@ -27,4 +27,9 @@ def reconcile_bytes(input_bytes: bytes) -> bytes:
                 os.remove(path)
 
 
-registry.register("reconcile", reconcile_bytes)
+registry.register(
+    "reconcile",
+    reconcile_bytes,
+    label="Сверка проводок по валютам",
+    description="Один Excel -> несколько листов EUR/USD/RUB и matched-сверка.",
+)
