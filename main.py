@@ -15,6 +15,22 @@ app.include_router(processor_router)
 
 # Background task for Telethon listener
 tg_task = None
+tg_boot_task = None
+
+
+async def _boot_tg_listener():
+    global tg_task
+    try:
+        from tg_listener import install_handlers
+        from tg_sender import client
+
+        install_handlers()
+        await asyncio.wait_for(client.start(), timeout=15)
+        tg_task = asyncio.create_task(client.run_until_disconnected())
+        print("✅ TG listener started")
+    except Exception as e:
+        # Do not block HTTP startup if Telegram is slow, misconfigured, or unavailable.
+        print("⚠️ TG listener not started:", repr(e))
 
 
 @app.on_event("startup")
@@ -22,27 +38,19 @@ async def startup():
     # Give Render some time before health-checks
     await asyncio.sleep(2)
 
-    # Start TG listener in the background (must NOT block FastAPI startup)
-    global tg_task
-    try:
-        from tg_listener import install_handlers
-        from tg_sender import client
-
-        install_handlers()
-        await client.start()
-        tg_task = asyncio.create_task(client.run_until_disconnected())
-
-        print("✅ TG listener started")
-    except Exception as e:
-        # Do not crash the API if Telegram env vars are missing or TG fails to start
-        print("⚠️ TG listener not started:", repr(e))
+    # Start TG listener in the background and let HTTP come up immediately.
+    global tg_boot_task
+    tg_boot_task = asyncio.create_task(_boot_tg_listener())
 
 
 @app.on_event("shutdown")
 async def shutdown():
-    global tg_task
+    global tg_task, tg_boot_task
     try:
         from tg_sender import client
+
+        if tg_boot_task:
+            tg_boot_task.cancel()
 
         if tg_task:
             tg_task.cancel()
