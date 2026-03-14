@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill
+from openpyxl.cell.cell import MergedCell
 from copy import copy
 
 # жёлтая заливка для несовпадений
@@ -14,8 +15,14 @@ debit_cols  = {'EUR': 'Дебет €', 'USD': 'Дебет $', 'RUB': 'Дебе�
 credit_cols = {'EUR': 'Кредит €','USD': 'Кредит $','RUB': 'Кредит ₽'}
 
 def copy_row(src_row, dst_ws, dst_row_idx):
-    for src_cell in src_row:
-        dst = dst_ws.cell(row=dst_row_idx, column=src_cell.col_idx, value=src_cell.value)
+    # openpyxl yields MergedCell placeholders for merged ranges; copy them as blanks
+    # while preserving the original column positions in the destination sheet.
+    for col_idx, src_cell in enumerate(src_row, start=1):
+        if isinstance(src_cell, MergedCell):
+            dst_ws.cell(row=dst_row_idx, column=col_idx, value=None)
+            continue
+
+        dst = dst_ws.cell(row=dst_row_idx, column=col_idx, value=src_cell.value)
         if src_cell.has_style:
             dst.font          = copy(src_cell.font)
             dst.border        = copy(src_cell.border)
