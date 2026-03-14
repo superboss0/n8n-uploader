@@ -50,7 +50,7 @@ async def upload_form() -> str:
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Обработка Excel</title>
+  <title>fin_tools</title>
   <style>
     :root {{
       --bg: #f3efe7;
@@ -174,7 +174,7 @@ async def upload_form() -> str:
 <body>
   <div>
     <main class="card">
-      <h1>Обработка Excel</h1>
+      <h1>fin_tools</h1>
       <p>Единая точка входа для бухгалтерских Excel-сценариев. Старые API-маршруты остаются рабочими.</p>
 
       <div class="processor-list">

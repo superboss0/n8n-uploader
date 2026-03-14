@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from routes import processor_router
 
-app = FastAPI()
+app = FastAPI(title="fin_tools")
 app.include_router(processor_router)
 
 # Background task for Telethon listener
