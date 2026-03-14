@@ -8,7 +8,10 @@ from datetime import datetime
 import traceback
 from pydantic import BaseModel
 
+from routes import processor_router
+
 app = FastAPI()
+app.include_router(processor_router)
 
 # Background task for Telethon listener
 tg_task = None
