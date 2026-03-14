@@ -6,6 +6,7 @@ import traceback
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, Response
+from starlette.concurrency import run_in_threadpool
 
 import processors
 from fg_vs_mb_reconcile import reconcile_files
@@ -232,7 +233,7 @@ async def run_processor(
             raise HTTPException(status_code=400, detail="Please upload an Excel file (.xlsx / .xls)")
 
         input_bytes = await file.read()
-        output_bytes = processor_spec.handler(input_bytes)
+        output_bytes = await run_in_threadpool(processor_spec.handler, input_bytes)
         output_name = make_safe_download_name(filename, processor)
 
         return Response(
@@ -274,7 +275,7 @@ async def run_fg_mb_reconcile(
             b_path = tmp_b.name
             tmp_b.write(await file_b.read())
 
-        out_path, _report_kind = reconcile_files(a_path, b_path)
+        out_path, _report_kind = await run_in_threadpool(reconcile_files, a_path, b_path)
 
         with open(out_path, "rb") as result_file:
             output_bytes = result_file.read()
