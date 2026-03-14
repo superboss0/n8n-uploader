@@ -2,6 +2,7 @@
 import sys
 import os
 from datetime import datetime
+from collections import defaultdict, deque
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill
 from openpyxl.cell.cell import MergedCell
@@ -106,21 +107,21 @@ def reconcile(in_path, out_path):
             elif c and not d:
                 credits.append(cells)
 
-        used, pairs = set(), []
+        credit_buckets = defaultdict(deque)
+        for c_cells in credits:
+            credit_buckets[c_cells[c_idx-1].value].append(c_cells)
+
+        pairs = []
         for d_cells in debits:
             amt = d_cells[d_idx-1].value
-            found = False
-            for i, c_cells in enumerate(credits):
-                if i not in used and c_cells[c_idx-1].value == amt:
-                    pairs.append((d_cells, c_cells, True))
-                    used.add(i)
-                    found = True
-                    break
-            if not found:
+            if credit_buckets[amt]:
+                pairs.append((d_cells, credit_buckets[amt].popleft(), True))
+            else:
                 pairs.append((d_cells, None, False))
-        for i, c_cells in enumerate(credits):
-            if i not in used:
-                pairs.append((None, c_cells, False))
+
+        for remaining in credit_buckets.values():
+            while remaining:
+                pairs.append((None, remaining.popleft(), False))
 
         out = dst_wb.create_sheet(f'{cur}_matched')
         out.append([f'D_{h}' for h in hdr] + [f'C_{h}' for h in hdr])
