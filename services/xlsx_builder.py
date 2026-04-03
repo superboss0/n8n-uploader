@@ -13,6 +13,10 @@ MAX_SHEET_NAME_LENGTH = 31
 MAX_COLUMN_WIDTH = 50
 INVALID_SHEET_CHARS_RE = re.compile(r"[:\\/?*\[\]]")
 INVALID_FILE_CHARS_RE = re.compile(r'[<>:"/\\|?*]+')
+NUMBER_FORMAT = "#,##0"
+HEADER_ALIASES = {
+    "Operators_Net change_Last_72_hours - Operator_name → Δ_avg_daily_usd": "Δ_avg_daily_usd",
+}
 
 
 def normalize_file_name(file_name: str | None) -> str:
@@ -59,6 +63,10 @@ def collect_headers(rows: list[dict[str, Any]]) -> list[str]:
     return headers
 
 
+def display_header(header: str) -> str:
+    return HEADER_ALIASES.get(header, header)
+
+
 def autosize_columns(worksheet) -> None:
     for column_cells in worksheet.columns:
         max_length = 0
@@ -77,13 +85,18 @@ def write_sheet(worksheet, rows: list[dict[str, Any]]) -> None:
         return
 
     headers = collect_headers(rows)
-    worksheet.append(headers)
+    worksheet.append([display_header(header) for header in headers])
 
     for cell in worksheet[1]:
         cell.font = Font(bold=True)
 
     for row in rows:
         worksheet.append([row.get(header) for header in headers])
+
+    for row in worksheet.iter_rows(min_row=2):
+        for cell in row:
+            if isinstance(cell.value, (int, float)) and not isinstance(cell.value, bool):
+                cell.number_format = NUMBER_FORMAT
 
     worksheet.freeze_panes = "A2"
     worksheet.auto_filter.ref = worksheet.dimensions

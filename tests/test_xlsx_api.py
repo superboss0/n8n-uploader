@@ -22,8 +22,19 @@ class XlsxApiTests(unittest.TestCase):
                 {
                     "name": "Operator Alert",
                     "rows": [
-                        {"merchant": "A", "currency": "INR", "balance": 1000},
-                        {"merchant": "B", "currency": "USD", "balance": 2000, "status": "ok"},
+                        {
+                            "merchant": "A",
+                            "currency": "INR",
+                            "balance": 1000,
+                            "Operators_Net change_Last_72_hours - Operator_name → Δ_avg_daily_usd": 12345.67,
+                        },
+                        {
+                            "merchant": "B",
+                            "currency": "USD",
+                            "balance": 2000,
+                            "status": "ok",
+                            "Operators_Net change_Last_72_hours - Operator_name → Δ_avg_daily_usd": None,
+                        },
                     ],
                 },
                 {
@@ -51,12 +62,14 @@ class XlsxApiTests(unittest.TestCase):
         ws = workbook["Operator Alert"]
         self.assertEqual(
             [cell.value for cell in ws[1]],
-            ["merchant", "currency", "balance", "status"],
+            ["merchant", "currency", "balance", "Δ_avg_daily_usd", "status"],
         )
-        self.assertEqual([cell.value for cell in ws[2]], ["A", "INR", 1000, None])
-        self.assertEqual([cell.value for cell in ws[3]], ["B", "USD", 2000, "ok"])
+        self.assertEqual([cell.value for cell in ws[2]], ["A", "INR", 1000, 12345.67, None])
+        self.assertEqual([cell.value for cell in ws[3]], ["B", "USD", 2000, None, "ok"])
+        self.assertEqual(ws["C2"].number_format, "#,##0")
+        self.assertEqual(ws["D2"].number_format, "#,##0")
         self.assertEqual(ws.freeze_panes, "A2")
-        self.assertEqual(ws.auto_filter.ref, "A1:D3")
+        self.assertEqual(ws.auto_filter.ref, "A1:E3")
 
         empty_ws = workbook["Merchant Alert"]
         self.assertEqual(empty_ws.max_row, 1)
