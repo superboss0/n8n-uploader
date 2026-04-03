@@ -8,10 +8,10 @@ from datetime import datetime
 import traceback
 from pydantic import BaseModel
 
-from routes import processor_router
+from routes import router as app_router
 
 app = FastAPI(title="fin_tools")
-app.include_router(processor_router)
+app.include_router(app_router)
 
 # Background task for Telethon listener
 tg_task = None
@@ -40,6 +40,9 @@ async def startup():
 
     # Start TG listener in the background and let HTTP come up immediately.
     global tg_boot_task
+    if os.getenv("DISABLE_TG_BOOT") == "1":
+        print("ℹ️ TG listener boot disabled")
+        return
     tg_boot_task = asyncio.create_task(_boot_tg_listener())
 
 
